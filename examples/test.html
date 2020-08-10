@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ECSY Particles</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+    </style>
+    <script defer type="module">
+      import * as THREE from "three"
+      import * as ECSY from "ecsy"
+      import * as ECSYTHREE from "ecsy-three"
+      import * as ECSYTHREEX from "ecsy-three/extras"
+      import * as PARTICLES from "../dist/ecsy-particles.js"
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls"
+
+      let time = 0;
+      let randx = Math.random() * (1.5 - (-1.5)) + (-1.5);
+      let randz = Math.random() * (0.3 - (-0.3)) + (-0.3);
+      let randtime = Math.random() * (2 - 1.5) + 1.5;
+
+      class Firework extends ECSY.Component {}
+      Firework.schema = {
+        x: { type: ECSY.Types.Number },
+        y: { type: ECSY.Types.Number },
+        z: { type: ECSY.Types.Number }
+      }
+
+      class FireworkSystem extends ECSY.System {
+        execute(dt, t) {
+          
+          for (let entity of this.queries.firework.results) {
+            const firework = entity.getComponent(Firework)
+            /** @type {ECSYTHREEX.Transform} */
+            const transform = entity.getMutableComponent(ECSYTHREEX.Transform)
+            if (t - time < 100) {
+              if (t - time < randtime) {
+                transform.position.x = randx*(t - time)
+                transform.position.y = 3*Math.sin((t - time))-2
+                transform.position.z = randz*(t - time)
+
+              } else {
+                
+                randtime = Math.random() * (2 - 1.5) + 1.5;
+                randx = Math.random() * (1.5 - (-1.5)) + (-1.5);
+                randz = Math.random() * (0.3 - (-0.3)) + (-0.3);
+                time = t
+
+                world
+                  .createEntity()
+                  .addComponent(ECSYTHREEX.Transform, {
+                    position: {
+                      x: transform.position.x,
+                      y: transform.position.y,
+                      z: transform.position.z
+                    }
+                  })
+                  .addComponent(PARTICLES.ParticleEmitter, {
+                    particleMesh: sharedParticleMesh,
+                    atlas: "blob.png",
+                    count: 200,
+                    lifeTime: 2,
+                    colors: [new THREE.Color("yellow"), new THREE.Color("orange")],
+                    scales: [1.5, 1.5, 1.5],
+                    repeatTime: 1000,
+                    burst: 1,
+                    radialAcceleration: 0.2,
+                    syncTransform: true
+                  })
+              }
+            }
+          }
+        }
+      }
+
+      FireworkSystem.queries = {
+        firework: {
+          components: [Firework, ECSYTHREEX.Transform]
+        }
+      }
+
+  
+
+      const world = new ECSYTHREE.ECSYThreeWorld()
+        .registerSystem(FireworkSystem)
+        .registerComponent(ECSYTHREEX.Transform)
+        .registerComponent(Firework)
+
+      PARTICLES.initializeParticleSystem(world)
+
+      const data = ECSYTHREEX.initialize(world, { vr: false })
+
+      const { scene, renderer, camera } = data.entities
+
+      const cam = camera.getComponent(ECSYTHREE.Object3DComponent)["value"]
+      cam.position.set(0, 0, 1.5)
+      
+      setTimeout(() => {
+        const domElement = document.body.querySelector("canvas")
+        const controls = new OrbitControls(cam, domElement)
+      }, 0)
+
+      const sharedParticleMesh = PARTICLES.createParticleMesh({
+        texture: "assets/spritesheet.png",
+        particleCount: 20000,
+        alphaTest: 0.01,
+        useBrownianMotion: true,
+        useVelocityScale: true,
+        transparent: true,
+        depthWrite: false
+      })
+
+      const scene3D = scene.getComponent(ECSYTHREE.Object3DComponent)["value"]
+
+      // scene3D.add(new THREE.AxesHelper())
+      // scene3D.add(new THREE.GridHelper(2,1))
+      scene3D.add(new THREE.AmbientLight(0x404040))
+      scene3D.add(new THREE.DirectionalLight())
+      scene3D.add(sharedParticleMesh)
+
+      world
+        .createEntity("firework")
+        .addComponent(ECSYTHREEX.Transform)
+        .addComponent(Firework)
+        .addComponent(PARTICLES.ParticleEmitter, {
+          particleMesh: sharedParticleMesh,
+          atlas: "blob.png",
+          count: 200,
+          lifeTime: 1.5,
+          colors: [ new THREE.Color("yellow"), new THREE.Color("red")],
+          radialAcceleration: 0.2,
+          scales: [2, 2, 2],
+          syncTransform: true,
+        })
+      
+      world.execute(0.000001, 0.000001)
+
+</script>
+</head>
+<body></body>
+</html>

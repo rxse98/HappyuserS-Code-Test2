@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>ECSY Particles</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+    </style>
+    <script defer type="module">
+      import * as THREE from "three"
+      import * as ECSY from "ecsy"
+      import * as ECSYTHREE from "ecsy-three"
+      import * as ECSYTHREEX from "ecsy-three/extras"
+      import * as PARTICLES from "../dist/ecsy-particles.js"
+      import { OrbitControls } from "three/examples/jsm/controls/OrbitControls"
+
+      const DEG2RAD = THREE.MathUtils.DEG2RAD
+
+      class CircularTranslating extends ECSY.Component {}
+      CircularTranslating.schema = {
+        explosion: { type: ECSY.Types.Number, default: 1 }
+      }
+
+
+      class CircularTranslatingSystem extends ECSY.System {
+        execute(dt, t) {
+          for (let entity of this.queries.translating.results) {
+            const translating = entity.getComponent(CircularTranslating)
+            /** @type {ECSYTHREEX.Transform} */
+            const transform = entity.getMutableComponent(ECSYTHREEX.Transform)
+
+            transform.position.y = 3*Math.sin(t)
+            transform.position.x = -t
+          }
+        }
+      }
+
+      CircularTranslatingSystem.queries = {
+        translating: {
+          components: [CircularTranslating, ECSYTHREEX.Transform]
+        }
+      }
+
+
+
+      class FExplosion extends ECSY.Component {}
+      FExplosion.schema = {
+
+      }
+
+      class FExplosionSystem extends ECSY.System {
+        execute(dt, t) {
+          for (let entity of this.queries.translating.results) {
+            const translating = entity.getComponent(FExplosion)
+            /** @type {ECSYTHREEX.Transform} */
+            const transform = entity.getMutableComponent(ECSYTHREEX.Transform)
+
+            transform.position.y = 3*Math.sin(t)
+            transform.position.x = -t
+          }
+        }
+      }
+
+      FExplosionSystem.queries = {
+        translating: {
+          components: [FExplosion, ECSYTHREEX.Transform]
+        }
+      }
+
+      const world = new ECSYTHREE.ECSYThreeWorld()
+        .registerSystem(CircularTranslatingSystem)
+        .registerSystem(FExplosionSystem)
+        .registerComponent(ECSYTHREEX.Transform)
+        .registerComponent(CircularTranslating)
+        .registerComponent(FExplosion)
+
+      PARTICLES.initializeParticleSystem(world)
+
+      const data = ECSYTHREEX.initialize(world, { vr: false })
+
+      const { scene, renderer, camera } = data.entities
+
+
+      const cam = camera.getComponent(ECSYTHREE.Object3DComponent)["value"]
+      cam.position.set(0,0,1.5)
+      // cam.lookAt(0, 1, 0)
+      
+
+      setTimeout(() => {
+        const domElement = document.body.querySelector("canvas")
+        const controls = new OrbitControls(cam, domElement)
+        // controls.target = new THREE.Vector3(9, 9, 0);
+
+      }, 0)
+
+
+      const coneGeo = new THREE.ConeBufferGeometry()
+      const coneMesh = new THREE.Mesh(
+        coneGeo,
+        new THREE.MeshStandardMaterial({ color: "pink" })
+      )
+      const coneParticleMesh = PARTICLES.createParticleMesh({
+        mesh: coneMesh,
+        style: "mesh",
+        particleCount: 2000
+      })
+      const sharedParticleMesh = PARTICLES.createParticleMesh({
+        texture: "assets/spritesheet.png",
+        particleCount: 20000,
+        alphaTest: 0.01,
+        useBrownianMotion: true,
+        useVelocityScale: true,
+        transparent: true,
+        depthWrite: false
+      })
+      const scene3D = scene.getComponent(ECSYTHREE.Object3DComponent)["value"]
+
+      scene3D.add(new THREE.AxesHelper())
+      scene3D.add(new THREE.GridHelper(2,1))
+      scene3D.add(new THREE.AmbientLight(0x404040))
+      scene3D.add(new THREE.DirectionalLight())
+      scene3D.add(sharedParticleMesh)
+      scene3D.add(coneParticleMesh)
+
+      console.log('sharedParticleMesh', sharedParticleMesh)
+
+      const coneGeo2 = new THREE.ConeBufferGeometry()
+      const coneMesh2 = new THREE.Mesh(
+        coneGeo2,
+        new THREE.MeshStandardMaterial({ color: "pink" })
+      )
+
+      const object = world
+        .createEntity()
+        .addObject3DComponent(coneMesh2.clone(), scene)
+        .addComponent(CircularTranslating, {
+
+        })
+        .addComponent(ECSYTHREEX.Transform, {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 }
+        })
+        .addComponent(ECSYTHREEX.Parent, { value: scene })
+      console.log('object', object)
+
+      world
+        .createEntity()
+        .addComponent(PARTICLES.ParticleEmitter, {
+          particleMesh: sharedParticleMesh,
+          atlas: "blob.png",
+          // atlas: "explosion_sheet.png",
+          count: 200,
+          lifeTime: 2,
+          colors: [ new THREE.Color("yellow"), new THREE.Color("red")],
+          radialAcceleration: 0.3,
+          scales: [2, 2],
+          syncTransform: true,
+        })
+        .addComponent(ECSYTHREEX.Transform, {
+          position: { x: 0, y: -2, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 }
+        })
+        .addComponent(ECSYTHREEX.Parent, { value: object })
+
+      world.execute(0.000001, 0.000001)
+
+    </script>
+  </head>
+  <body></body>
+</html>
